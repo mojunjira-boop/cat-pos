@@ -203,6 +203,7 @@
     .receipt { position: fixed; top: 0; left: 0; width: 100%; }
   }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -402,6 +403,7 @@
           <button onclick="setDateFilterToday()" style="padding:6px 12px;background:var(--accent-light);color:var(--accent-dark);border:1px solid var(--accent);border-radius:var(--radius);font-size:12px;cursor:pointer;font-family:inherit;font-weight:600;">วันนี้</button>
           <button onclick="clearDateFilter()" style="padding:6px 12px;background:var(--surface2);color:var(--text2);border:1px solid var(--border2);border-radius:var(--radius);font-size:12px;cursor:pointer;font-family:inherit;">ล้าง</button>
           <button id="line-copy-btn" onclick="copyLineReport()" style="padding:6px 14px;background:#06C755;color:#fff;border:none;border-radius:var(--radius);font-size:12px;cursor:pointer;font-family:inherit;font-weight:700;">📋 Copy รายงาน LINE</button>
+          <button onclick="exportExcel()" style="padding:6px 14px;background:#1d6f42;color:#fff;border:none;border-radius:var(--radius);font-size:12px;cursor:pointer;font-family:inherit;font-weight:700;">📥 ส่งออก Excel</button>
         </div>
       </div>
       <div id="filter-summary-label" style="margin-top:8px;font-size:13px;color:var(--text3);"></div>
@@ -1298,7 +1300,101 @@ async function copyLineReport() {
   }
 }
 
-// ---- renderReports (daily tab) ----
+// ===== EXPORT EXCEL =====
+function exportExcel() {
+  const bills = getFilteredBills();
+  if (bills.length === 0) { showToast('ไม่มีข้อมูลบิลในช่วงนี้', 'warning'); return; }
+
+  const BOTTLE_PRICE = 120;
+  const payLbl = { cash:'เงินสด', transfer:'โอนเงิน', card:'บัตรแลก', credit:'เบิก', mixed:'ผสม' };
+
+  // ---- Sheet 1: รายการบิลทั้งหมด ----
+  const billRows = [
+    ['เลขบิล','วันที่','เวลา','ผู้ขาย','สินค้า','วิธีชำระ','เงินสด','โอนเงิน','บัตรแลก(บาท)','บัตรแลก(ขวด)','เบิก(บาท)','เบิก(ขวด)','ส่วนลด','ยอดรวม','กำไร']
+  ];
+  bills.forEach(b => {
+    const d = new Date(b.dateObj);
+    const dateStr = d.toLocaleDateString('th-TH', {day:'2-digit', month:'2-digit', year:'numeric'});
+    const timeStr = d.toLocaleTimeString('th-TH', {hour:'2-digit', minute:'2-digit'});
+    const itemsStr = b.items.map(i => `${i.name}×${i.qty}`).join(', ');
+    const sp = b.splits || {};
+    let payLabel = payLbl[b.payMethod] || b.payMethod;
+    if (sp && Object.keys(sp).filter(m => sp[m] > 0).length > 1) payLabel = 'ผสม';
+    const cash     = sp.cash     || (b.payMethod === 'cash'     ? b.total : 0);
+    const transfer = sp.transfer || (b.payMethod === 'transfer' ? b.total : 0);
+    const card     = sp.card     || (b.payMethod === 'card'     ? b.total : 0);
+    const credit   = sp.credit   || (b.payMethod === 'credit'   ? b.total : 0);
+    billRows.push([
+      '#' + b.billNo, dateStr, timeStr, b.cashier || '-', itemsStr, payLabel,
+      cash, transfer,
+      card, Math.floor(card / BOTTLE_PRICE),
+      credit, Math.floor(credit / BOTTLE_PRICE),
+      b.discount || 0, b.total, b.profit || 0
+    ]);
+  });
+
+  // ---- Sheet 2: สรุปยอดรวม ----
+  const payMap = { cash:0, transfer:0, card:0, credit:0 };
+  bills.forEach(b => {
+    const sp = b.splits || {};
+    if (Object.keys(sp).filter(m => sp[m] > 0).length > 0) {
+      Object.entries(sp).forEach(([m,v]) => { if (payMap[m] !== undefined) payMap[m] += v; });
+    } else if (payMap[b.payMethod] !== undefined) {
+      payMap[b.payMethod] += b.total;
+    }
+  });
+  const totalRev    = bills.reduce((s,b) => s + b.total, 0);
+  const totalProfit = bills.reduce((s,b) => s + (b.profit || 0), 0);
+  const totalDisc   = bills.reduce((s,b) => s + (b.discount || 0), 0);
+  const summaryRows = [
+    ['รายการ', 'ยอด (บาท)', 'หมายเหตุ'],
+    ['จำนวนบิลทั้งหมด', bills.length, ''],
+    ['ยอดขายรวม', totalRev, ''],
+    ['เงินสด', payMap.cash, ''],
+    ['โอนเงิน', payMap.transfer, ''],
+    ['บัตรแลก', payMap.card, `${Math.floor(payMap.card / BOTTLE_PRICE)} ขวด`],
+    ['เบิก', payMap.credit, `${Math.floor(payMap.credit / BOTTLE_PRICE)} ขวด`],
+    ['ส่วนลดรวม', totalDisc, ''],
+    ['กำไรขั้นต้น', totalProfit, ''],
+  ];
+
+  // ---- Sheet 3: สต็อกสินค้า ----
+  const stockRows = [['รหัส','ชื่อสินค้า','หมวด','ราคาขาย','ต้นทุน','คงเหลือ','แจ้งเตือนที่']];
+  state.products.forEach(p => {
+    stockRows.push([p.code, p.name, p.cat, p.price, p.cost, p.stock, p.alertAt]);
+  });
+
+  // ---- Build XLSX using SheetJS (CDN) ----
+  const XLSX = window.XLSX;
+  if (!XLSX) { showToast('กำลังโหลด SheetJS...', ''); return; }
+
+  const wb = XLSX.utils.book_new();
+
+  const ws1 = XLSX.utils.aoa_to_sheet(billRows);
+  // Column widths
+  ws1['!cols'] = [8,12,8,10,40,8,10,10,12,12,10,10,8,10,10].map(w=>({wch:w}));
+  // Header style (SheetJS community edition doesn't support cell styles, but we set freeze pane)
+  ws1['!freeze'] = { xSplit: 0, ySplit: 1 };
+  XLSX.utils.book_append_sheet(wb, ws1, 'รายการบิล');
+
+  const ws2 = XLSX.utils.aoa_to_sheet(summaryRows);
+  ws2['!cols'] = [{wch:20},{wch:14},{wch:16}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'สรุปยอด');
+
+  const ws3 = XLSX.utils.aoa_to_sheet(stockRows);
+  ws3['!cols'] = [8,20,12,10,10,10,12].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb, ws3, 'สต็อกสินค้า');
+
+  // File name with date range
+  const dateFrom = document.getElementById('filter-date-from')?.value || '';
+  const dateTo   = document.getElementById('filter-date-to')?.value || '';
+  const today    = new Date().toISOString().slice(0,10);
+  const label    = dateFrom ? (dateTo && dateTo !== dateFrom ? `${dateFrom}_${dateTo}` : dateFrom) : today;
+  const filename = `CAT-POS_รายงาน_${label}.xlsx`;
+
+  XLSX.writeFile(wb, filename);
+  showToast(`ดาวน์โหลด ${filename} แล้ว ✅`, 'success');
+}
 function renderReports() {
   const bills = getFilteredBills();
   const today = new Date().toISOString().slice(0,10);
@@ -2381,7 +2477,7 @@ Object.assign(window, {
   setSellCat, renderSellProducts,
   setProdCat, renderProductTable, openProductModal, saveProduct, deleteProduct,
   receiveStock, adjustStock,
-  setReportTab, renderReports, setDateFilterToday, clearDateFilter, copyLineReport,
+  setReportTab, renderReports, setDateFilterToday, clearDateFilter, copyLineReport, exportExcel,
   deleteBill, deleteBillAndRefresh, filterHistoryTable, clearSalesHistory, reopenReceipt,
   drillDay, drillBill, backToMonth, backToDay, prevMonth, nextMonth, selectMonth, selectYear, setMonthSubTab,
   openUserModal, saveUser, deleteUser,
