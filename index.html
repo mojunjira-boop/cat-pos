@@ -624,11 +624,13 @@ function setSyncStatus(status) {
 async function save() {
   // Always keep localStorage as fallback
   localStorage.setItem('moji-pos', JSON.stringify(state));
+  // กันไว้ทันที ไม่ต้องรอครบ 600ms — ป้องกันไม่ให้ onSnapshot ที่มาระหว่างรอ
+  // debounce เอาข้อมูลเก่า (ก่อนขาย) มาทับ state ที่เพิ่งเปลี่ยนไป
+  _isSaving = true;
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(async () => {
     setSyncStatus('syncing');
     try {
-      _isSaving = true;
       await setDoc(STATE_DOC, { data: JSON.stringify(state) });
       setSyncStatus('ok');
     } catch(e) {
