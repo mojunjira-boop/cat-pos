@@ -401,6 +401,7 @@
         </div>
         <div style="display:flex;gap:6px;padding-top:16px;">
           <button onclick="setDateFilterToday()" style="padding:6px 12px;background:var(--accent-light);color:var(--accent-dark);border:1px solid var(--accent);border-radius:var(--radius);font-size:12px;cursor:pointer;font-family:inherit;font-weight:600;">วันนี้</button>
+          <button onclick="setDateFilterThisMonth()" style="padding:6px 12px;background:var(--accent-light);color:var(--accent-dark);border:1px solid var(--accent);border-radius:var(--radius);font-size:12px;cursor:pointer;font-family:inherit;font-weight:600;">เดือนนี้</button>
           <button onclick="clearDateFilter()" style="padding:6px 12px;background:var(--surface2);color:var(--text2);border:1px solid var(--border2);border-radius:var(--radius);font-size:12px;cursor:pointer;font-family:inherit;">ล้าง</button>
           <button id="line-copy-btn" onclick="copyLineReport()" style="padding:6px 14px;background:#06C755;color:#fff;border:none;border-radius:var(--radius);font-size:12px;cursor:pointer;font-family:inherit;font-weight:700;">📋 Copy รายงาน LINE</button>
           <button onclick="exportExcel()" style="padding:6px 14px;background:#1d6f42;color:#fff;border:none;border-radius:var(--radius);font-size:12px;cursor:pointer;font-family:inherit;font-weight:700;">📥 ส่งออก Excel</button>
@@ -434,8 +435,13 @@
     </div>
     <div class="report-section" style="margin-top:16px;">
       <h3>ประวัติบิล</h3>
+      <div id="bill-select-bar" style="display:none;align-items:center;gap:10px;background:var(--accent-light);border:1px solid var(--accent);border-radius:var(--radius);padding:8px 12px;margin-bottom:10px;font-size:13px;">
+        <span id="bill-select-count" style="font-weight:700;color:var(--accent-dark);"></span>
+        <button onclick="deleteSelectedBills()" style="padding:5px 12px;background:var(--danger);color:#fff;border:none;border-radius:var(--radius);font-size:12px;cursor:pointer;font-family:inherit;font-weight:700;">🗑️ ลบที่เลือก</button>
+        <button onclick="clearBillSelection()" style="padding:5px 12px;background:var(--surface2);color:var(--text2);border:1px solid var(--border2);border-radius:var(--radius);font-size:12px;cursor:pointer;font-family:inherit;">ยกเลิกเลือก</button>
+      </div>
       <table>
-        <thead><tr><th>บิล</th><th>วันที่</th><th>เวลา</th><th>ผู้ขาย</th><th>รายการ</th><th>วิธีชำระ</th><th>ส่วนลด</th><th>ยอดรวม</th><th>กำไร</th><th>พิมพ์</th><th>ลบ</th></tr></thead>
+        <thead><tr><th><input type="checkbox" id="bill-select-all" onchange="toggleSelectAllBills(this.checked)"></th><th>บิล</th><th>วันที่</th><th>เวลา</th><th>ผู้ขาย</th><th>รายการ</th><th>วิธีชำระ</th><th>ส่วนลด</th><th>ยอดรวม</th><th>กำไร</th><th>พิมพ์</th><th>ลบ</th></tr></thead>
         <tbody id="bills-tbody"></tbody>
       </table>
     </div>
@@ -564,7 +570,7 @@
 const DEFAULT_PROD_IMG = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAoHBwgHBgoICAgLCgoLDhgQDg0NDh0VFhEYIx8lJCIfIiEmKzcvJik0KSEiMEExNDk7Pj4+JS5ESUM8SDc9Pjv/2wBDAQoLCw4NDhwQEBw7KCIoOzs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozv/wAARCAAjADwDASIAAhEBAxEB/8QAGwAAAgIDAQAAAAAAAAAAAAAABAYABQEDBwL/xAAvEAABAwMCBQMCBgMAAAAAAAABAgMEAAUREiEGEzFBURQicTKBFRYjQpGhYfDx/8QAGQEAAgMBAAAAAAAAAAAAAAAAAAIBAwQF/8QAHxEAAwACAQUBAAAAAAAAAAAAAAECAxExBBIhIvHw/9oADAMBAAIRAxEAPwDrdxuDdtjCQ6ha0agk6BkjPegF8UwEg6EPrUCAEhvGT8mvfESFPQ2WEqUC48NkjJIAJO32pd9NCWjRFmOOPNJJIAUSRjJKsgYI7Z7Vmy3kVeq8GjHGNz7Dgm4RFNlYktYBIOVjYjqK0C9wC6Gy+EgoC0rUMJUD4NJcllbsuQ5zmxpcOk6O+ckjzn+qtYAZabiy3pCQ/j2oUUhK0acAb+M5OO9RGerprXAVimUnvku/zDA5ujUvRq0l3Ht6ZznxQ0/i62wGlPrK3Y6NOp5oBQGVYz8DvVM9b2jHbS1JflIKhzSyE63CNWSnTtkDqBQN1hR7vZ7i4l12HGfQhbi1tnCglxJVoSdwNh43NOqvfHgVzGhnVxnYlS4sSNPamPynQ2hEZYXpz3VvsKvK5tH4ftEe+2F6JLQ09GdS20E4VzkAKPu8KOo7/FdJq5PZSKPEk91N7bCV6Ew0hSd8ZUrr/WB/2hrhd2fQSlx0qTIlp/W9+RnpgeM164jt12XcpLjURUhDwAbLac4AA6+D80O/wxcnWV8ttRJKCnIAJx1zvtv/ADXMucrutL98OjLxKJ2zTClpRGWHjhw+f3Gr61stSeHGWZzWWntSjqAJTlRI+Nu9L/4JdXVLLtudSScjCcjGkjz5xTC2xPZtiYkiMQ56RLY5fuClDoNuhxTdNjpNukJ1FzpdrNd8kKirtz7bQS027tjA0DG23+cGqi/XmMm5w4jSW0tyXmWEhSRo3dSpQI8EA1d3CNKnkARlGKl9srJB1KSBjYddiTSRf3bezxPbrdcGExkxE+oW488GgtW+nTn6v25xjoa0OL79rj6UKp7NPkJuUZFvh3OVj04gXFhDbityEczt5P0/YV0uDKEyCzJAxzEBRA7HvStdbYniG1SYvLU6zNUHG3QcJ+nKVhWMY1E/6atLRcY0S3NQy08FRgG1Yw5kgAk6k5HetCKS8rNSpTEGKG5zn4ryNX6fI14x31YqVKCGFUPKhxZgCZUZl8DoHWwoD+alSgkVLlFYlcYNwX2w5GU2gco/SAB0A7D4puZYZjNBphpDTaeiEJCQPsKlSgD/2Q==";
 // ===== FIREBASE SETUP =====
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, deleteDoc, writeBatch, getDocs } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCAuOoqG_fAqyc3Cgc0ZiVWwKWQALCN68g",
@@ -578,6 +584,9 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 const STATE_DOC = doc(db, 'pos', 'state');
+// บิลแต่ละใบเก็บเป็นเอกสารแยกกัน ไม่รวมอยู่ใน STATE_DOC อีกต่อไป
+// (Firestore จำกัดเอกสารเดียวไว้ที่ 1MB — ถ้ารวมบิลนับพันใบไว้ในเอกสารเดียวจะเขียนไม่ผ่านในที่สุด)
+const BILLS_COL = collection(db, 'pos_bills');
 
 // ===== STATE =====
 const DEFAULT_STATE = {
@@ -621,8 +630,11 @@ function setSyncStatus(status) {
 }
 
 // Save to Firestore (debounced 600ms)
+// หมายเหตุ: state.bills ไม่ถูกส่งไปที่นี่ — บิลแต่ละใบเก็บแยกเป็นเอกสารของตัวเองใน BILLS_COL
+// (ดูฟังก์ชัน checkout, deleteBill, deleteSelectedBills, clearSalesHistory)
 async function save() {
-  // Always keep localStorage as fallback
+  const { bills, ...stateWithoutBills } = state;
+  // Always keep localStorage as fallback (เก็บบิลไว้ในเครื่องด้วยเผื่อ offline)
   localStorage.setItem('moji-pos', JSON.stringify(state));
   // กันไว้ทันที ไม่ต้องรอครบ 600ms — ป้องกันไม่ให้ onSnapshot ที่มาระหว่างรอ
   // debounce เอาข้อมูลเก่า (ก่อนขาย) มาทับ state ที่เพิ่งเปลี่ยนไป
@@ -631,7 +643,7 @@ async function save() {
   _saveTimer = setTimeout(async () => {
     setSyncStatus('syncing');
     try {
-      await setDoc(STATE_DOC, { data: JSON.stringify(state) });
+      await setDoc(STATE_DOC, { data: JSON.stringify(stateWithoutBills) });
       setSyncStatus('ok');
     } catch(e) {
       console.error('Firebase save error:', e);
@@ -651,9 +663,25 @@ async function initFirebase() {
       const loaded = JSON.parse(snap.data().data);
       // Merge: use cloud data, fallback fields from default if missing
       state = Object.assign({}, DEFAULT_STATE, loaded);
+      // ย้ายข้อมูล (migration): ถ้าเอกสารหลักยังมีบิลเก่าติดอยู่ (จากโครงสร้างเดิมก่อนแก้)
+      // ให้ย้ายไปเก็บเป็นเอกสารแยกใน BILLS_COL แล้วเซฟเอกสารหลักใหม่แบบไม่มีบิลอีก
+      if (Array.isArray(loaded.bills) && loaded.bills.length) {
+        try {
+          const legacyBills = loaded.bills;
+          for (let i = 0; i < legacyBills.length; i += 400) {
+            const batch = writeBatch(db);
+            legacyBills.slice(i, i+400).forEach(b => batch.set(doc(BILLS_COL, String(b.billNo)), b));
+            await batch.commit();
+          }
+          state.bills = [];
+          await save(); // เซฟเอกสารหลักใหม่แบบไม่มี bills แล้ว
+          console.log(`Migrated ${legacyBills.length} bills to pos_bills collection`);
+        } catch(e) { console.error('Bill migration error:', e); }
+      }
     } else {
       // First time — push default state to cloud
-      await setDoc(STATE_DOC, { data: JSON.stringify(state) });
+      const { bills, ...stateWithoutBills } = state;
+      await setDoc(STATE_DOC, { data: JSON.stringify(stateWithoutBills) });
     }
     setSyncStatus('ok');
   } catch(e) {
@@ -663,20 +691,16 @@ async function initFirebase() {
     setSyncStatus('offline');
   }
 
-  // Real-time listener — update UI when another device saves
+  // Real-time listener — update UI when another device saves (products/users/stock etc.)
   onSnapshot(STATE_DOC, (snap) => {
     if (!snap.exists() || _isSaving) return;
     try {
       const incoming = JSON.parse(snap.data().data);
+      const prevBills = state.bills; // เก็บบิลที่มีอยู่ในเครื่องไว้ (บิลไม่ได้มากับ snapshot นี้แล้ว)
       state = Object.assign({}, DEFAULT_STATE, incoming);
+      state.bills = prevBills;
       localStorage.setItem('moji-pos', JSON.stringify(state));
-      // Refresh whichever page is active
-      const active = document.querySelector('.page.active')?.id?.replace('page-','');
-      if (active === 'sell')     { renderSellCats(); renderSellProducts(); }
-      if (active === 'products') { renderProdCats(); renderProductTable(); }
-      if (active === 'stock')    { renderStock(); }
-      if (active === 'reports')  { renderReports(); }
-      if (active === 'users')    { renderUsers(); }
+      refreshActivePage();
       setSyncStatus('ok');
     } catch(e) { console.error('Snapshot parse error:', e); }
   }, (err) => {
@@ -684,9 +708,27 @@ async function initFirebase() {
     setSyncStatus('error');
   });
 
+  // Real-time listener แยกสำหรับบิล — แต่ละบิลเป็นคนละเอกสาร ไม่มีปัญหาเรื่องขนาดเอกสารเกินลิมิตอีก
+  onSnapshot(BILLS_COL, (snapshot) => {
+    state.bills = snapshot.docs.map(d => d.data());
+    localStorage.setItem('moji-pos', JSON.stringify(state));
+    refreshActivePage();
+  }, (err) => {
+    console.error('onSnapshot (bills) error:', err);
+  });
+
   // Boot UI
   renderSellCats();
   renderSellProducts();
+}
+
+function refreshActivePage() {
+  const active = document.querySelector('.page.active')?.id?.replace('page-','');
+  if (active === 'sell')     { renderSellCats(); renderSellProducts(); }
+  if (active === 'products') { renderProdCats(); renderProductTable(); }
+  if (active === 'stock')    { renderStock(); }
+  if (active === 'reports')  { reportTab === 'month' ? renderMonthlyReport() : renderReports(); }
+  if (active === 'users')    { renderUsers(); }
 }
 
 let currentUser = null;
@@ -984,9 +1026,14 @@ function checkout() {
     if(p) p.stock = Math.max(0, p.stock-item.qty);
   });
 
+  // เพิ่มบิลในเครื่องทันที (ให้ UI อัพเดตไว) แล้วค่อยส่งขึ้น Firestore เป็นเอกสารแยกของบิลนี้เอง
   state.bills.push(bill);
   state.nextBillNo++;
-  save();
+  save(); // เซฟเฉพาะ products/users/nextBillNo (ไม่รวมบิล)
+  setDoc(doc(BILLS_COL, String(bill.billNo)), bill).catch(e => {
+    console.error('Save bill error:', e);
+    showToast('บันทึกบิล #'+bill.billNo+' ขึ้น cloud ไม่สำเร็จ (เช็คอินเทอร์เน็ต)','error');
+  });
 
   document.getElementById('cart-bill-no').textContent = '#'+String(state.nextBillNo).padStart(4,'0');
   showReceipt(bill);
@@ -1214,6 +1261,18 @@ function setDateFilterToday() {
   renderReports();
 }
 
+// เลือกช่วงวันที่เป็น "เดือนนี้" ทั้งเดือน (ตั้งแต่วันที่ 1 ถึงวันสุดท้ายของเดือน)
+function setDateFilterThisMonth() {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth(), 1);
+  const last  = new Date(now.getFullYear(), now.getMonth()+1, 0);
+  document.getElementById('filter-date-from').value = first.toISOString().slice(0,10);
+  document.getElementById('filter-time-from').value = '00:00';
+  document.getElementById('filter-date-to').value   = last.toISOString().slice(0,10);
+  document.getElementById('filter-time-to').value   = '23:59';
+  renderReports();
+}
+
 function clearDateFilter() {
   ['filter-date-from','filter-time-from','filter-date-to','filter-time-to'].forEach(id => {
     const el = document.getElementById(id);
@@ -1222,8 +1281,78 @@ function clearDateFilter() {
   renderReports();
 }
 
+// ===== เลือกหลายบิลเพื่อลบพร้อมกัน (ทีละใบ หรือเลือกทั้งหมดที่กรองไว้ เช่น ทั้งเดือน) =====
+let selectedBills = new Set();
+
+function toggleBillSelect(billNo, checked) {
+  if (checked) selectedBills.add(billNo); else selectedBills.delete(billNo);
+  updateBillSelectionBar();
+  const selectAllEl = document.getElementById('bill-select-all');
+  if (selectAllEl) {
+    const bills = getFilteredBills();
+    selectAllEl.checked = bills.length>0 && bills.every(b=>selectedBills.has(b.billNo));
+  }
+}
+
+// เลือก/ยกเลิกเลือกทุกบิลที่กำลังแสดงอยู่ตามตัวกรองวันที่ปัจจุบัน (ใช้ร่วมกับปุ่ม "เดือนนี้" เพื่อเลือกทั้งเดือนได้)
+function toggleSelectAllBills(checked) {
+  const bills = getFilteredBills();
+  bills.forEach(b => checked ? selectedBills.add(b.billNo) : selectedBills.delete(b.billNo));
+  renderReports();
+}
+
+function clearBillSelection() {
+  selectedBills.clear();
+  renderReports();
+}
+
+function updateBillSelectionBar() {
+  const bar = document.getElementById('bill-select-bar');
+  const countEl = document.getElementById('bill-select-count');
+  if (!bar || !countEl) return;
+  if (selectedBills.size > 0) {
+    bar.style.display = 'flex';
+    countEl.textContent = `เลือกอยู่ ${selectedBills.size} บิล`;
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+async function deleteSelectedBills() {
+  const billNos = [...selectedBills];
+  if (!billNos.length) return;
+  if (!confirm(`⚠️ ต้องการลบ ${billNos.length} บิลที่เลือก?\nยอดเงิน ยอดน้ำ และสต็อกจะกลับเป็นเหมือนเดิม`)) return;
+
+  const billsToDelete = state.bills.filter(b => billNos.includes(b.billNo));
+  // คืนสต็อกของทุกบิลที่จะลบ
+  billsToDelete.forEach(bill => {
+    bill.items.forEach(item => {
+      const p = state.products.find(x => x.id === item.id);
+      if (p) p.stock += item.qty;
+    });
+  });
+  state.bills = state.bills.filter(b => !billNos.includes(b.billNo));
+  save();
+
+  await deleteBillsBatch(billNos);
+  selectedBills.clear();
+  renderReports();
+  showToast(`ลบ ${billNos.length} บิล และคืนสต็อกแล้ว`, 'warning');
+}
+
+// ---- Helper: ลบบิลหลายใบพร้อมกันบน Firestore (แบ่งเป็นชุดละ 450 เอกสาร) ----
+async function deleteBillsBatch(billNos) {
+  if (!billNos.length) return;
+  for (let i = 0; i < billNos.length; i += 450) {
+    const batch = writeBatch(db);
+    billNos.slice(i, i+450).forEach(no => batch.delete(doc(BILLS_COL, String(no))));
+    try { await batch.commit(); }
+    catch(e) { console.error('Batch delete error:', e); showToast('ลบบิลบางส่วนไม่สำเร็จ (เช็คอินเทอร์เน็ต)','error'); }
+  }
+}
+
 // ---- Delete bill and restore stock ----
-function deleteBill(billNo) {
+async function deleteBill(billNo) {
   if (!confirm(`⚠️ ต้องการลบบิล #${billNo}?\nยอดเงิน ยอดน้ำ และสต็อกจะกลับเป็นเหมือนเดิม`)) return;
   const bill = state.bills.find(b => b.billNo === billNo);
   if (!bill) return;
@@ -1234,9 +1363,11 @@ function deleteBill(billNo) {
     if (p) p.stock += item.qty;
   });
 
-  // Remove the bill
+  // Remove the bill (local + cloud)
   state.bills = state.bills.filter(b => b.billNo !== billNo);
   save();
+  try { await deleteDoc(doc(BILLS_COL, String(billNo))); }
+  catch(e) { console.error('Delete bill error:', e); showToast('ลบบิลใน cloud ไม่สำเร็จ (เช็คอินเทอร์เน็ต)','error'); }
   renderReports();
   showToast(`ลบบิล #${billNo} และคืนสต็อกแล้ว`, 'warning');
 }
@@ -1519,6 +1650,7 @@ function renderReports() {
         payDisp = methodLabel[b.payMethod]||b.payMethod;
       }
       return `<tr>
+        <td><input type="checkbox" class="bill-row-check" data-bill="${b.billNo}" ${selectedBills.has(b.billNo)?'checked':''} onchange="toggleBillSelect('${b.billNo}',this.checked)"></td>
         <td><code>#${b.billNo}</code></td>
         <td style="font-size:12px;">${dateStr}</td>
         <td style="font-size:12px;color:var(--text3);">${timeStr}</td>
@@ -1531,8 +1663,12 @@ function renderReports() {
         <td><button class="icon-btn" onclick="reopenReceipt('${b.billNo}')" title="ดูใบเสร็จ">🖨️</button></td>
         <td><button class="icon-btn danger" onclick="deleteBill('${b.billNo}')" title="ลบบิล" style="color:var(--danger);">🗑️</button></td>
       </tr>`;
-    }).join('') || '<tr><td colspan="11" style="text-align:center;color:var(--text3);">ยังไม่มีบิลในช่วงเวลานี้</td></tr>';
+    }).join('') || '<tr><td colspan="12" style="text-align:center;color:var(--text3);">ยังไม่มีบิลในช่วงเวลานี้</td></tr>';
   }
+  // sync "select all" checkbox + selection bar with what's actually shown
+  const selectAllEl = document.getElementById('bill-select-all');
+  if (selectAllEl) selectAllEl.checked = bills.length>0 && bills.every(b=>selectedBills.has(b.billNo));
+  updateBillSelectionBar();
 }
 
 
@@ -2181,15 +2317,16 @@ function filterHistoryTable() {
   });
 }
 
-function clearSalesHistory() {
+async function clearSalesHistory() {
   if (!confirm('⚠️ ต้องการล้างประวัติการขายทั้งหมดเลยไหม? ข้อมูลจะหายถาวร')) return;
+  const billNos = state.bills.map(b => b.billNo);
   state.bills = [];
-  save();
+  await deleteBillsBatch(billNos);
   renderMonthlyReport();
   showToast('ล้างประวัติการขายแล้ว', 'warning');
 }
 
-function deleteBillAndRefresh(billNo) {
+async function deleteBillAndRefresh(billNo) {
   if (!confirm(`⚠️ ต้องการลบบิล #${billNo}?\nยอดเงิน ยอดน้ำ และสต็อกจะกลับเป็นเหมือนเดิม`)) return;
   const bill = state.bills.find(b => b.billNo === billNo);
   if (!bill) return;
@@ -2199,6 +2336,8 @@ function deleteBillAndRefresh(billNo) {
   });
   state.bills = state.bills.filter(b => b.billNo !== billNo);
   save();
+  try { await deleteDoc(doc(BILLS_COL, String(billNo))); }
+  catch(e) { console.error('Delete bill error:', e); showToast('ลบบิลใน cloud ไม่สำเร็จ (เช็คอินเทอร์เน็ต)','error'); }
   renderMonthlyReport();
   showToast(`ลบบิล #${billNo} และคืนสต็อกแล้ว`, 'warning');
 }
@@ -2479,8 +2618,9 @@ Object.assign(window, {
   setSellCat, renderSellProducts,
   setProdCat, renderProductTable, openProductModal, saveProduct, deleteProduct,
   receiveStock, adjustStock,
-  setReportTab, renderReports, setDateFilterToday, clearDateFilter, copyLineReport, exportExcel,
+  setReportTab, renderReports, setDateFilterToday, setDateFilterThisMonth, clearDateFilter, copyLineReport, exportExcel,
   deleteBill, deleteBillAndRefresh, filterHistoryTable, clearSalesHistory, reopenReceipt,
+  toggleBillSelect, toggleSelectAllBills, clearBillSelection, deleteSelectedBills,
   drillDay, drillBill, backToMonth, backToDay, prevMonth, nextMonth, selectMonth, selectYear, setMonthSubTab,
   openUserModal, saveUser, deleteUser,
   closeModal, setupEmojiPicker,
